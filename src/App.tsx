@@ -205,9 +205,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white overflow-hidden relative">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-violet-900/10 via-gray-950 to-cyan-900/10" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(100,100,255,0.08),transparent_50%)]" />
+      {/* Background — muted industrial gray with subtle cold accents */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/40 via-gray-950 to-zinc-900/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(120,130,150,0.12),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(80,90,120,0.08),transparent_50%)]" />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-3 py-4">
         {/* Header */}
@@ -215,15 +216,16 @@ export default function App() {
           <div className="flex items-center gap-3">
             <motion.div
               animate={{ rotate: isPlaying ? 360 : 0 }}
-              transition={{ duration: 2, repeat: isPlaying ? Infinity : 0, ease: 'linear' }}
+              transition={{ duration: 3, repeat: isPlaying ? Infinity : 0, ease: 'linear' }}
             >
-              <Disc3 className="w-7 h-7 text-violet-400" />
+              <Disc3 className="w-7 h-7 text-slate-400" />
             </motion.div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                SynthGrid
+              <h1 className="text-xl font-bold tracking-tight">
+                <span className="text-slate-300">Gray</span>
+                <span className="bg-gradient-to-r from-slate-400 to-zinc-500 bg-clip-text text-transparent">born</span>
               </h1>
-              <p className="text-[10px] text-gray-500">Instrument Sequencer</p>
+              <p className="text-[10px] text-slate-500 tracking-widest uppercase">Sequencer</p>
             </div>
           </div>
           <Visualizer isPlaying={isPlaying} />
@@ -326,7 +328,7 @@ export default function App() {
             onClick={() => setShowInstrumentPicker(showInstrumentPicker ? null : 'add')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/50 text-violet-300 text-xs font-medium hover:bg-violet-500/30"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-500/20 border border-slate-500/50 text-slate-300 text-xs font-medium hover:bg-slate-500/30 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Instrument
@@ -417,9 +419,12 @@ export default function App() {
           </div>
         )}
 
-        <div className="mt-4 text-center">
-          <p className="text-[10px] text-gray-600">
-            Click cells to place notes • Select a track to adjust volume and pan • Add multiple instruments to layer sounds
+        <div className="mt-6 text-center">
+          <p className="text-[10px] text-slate-600 tracking-wide">
+            Click cells to place notes • Select a track to adjust volume and pan • Layer instruments to compose
+          </p>
+          <p className="text-[9px] text-slate-700 mt-1 tracking-widest uppercase">
+            Grayborn Sequencer · v1.0
           </p>
         </div>
       </div>
@@ -459,7 +464,7 @@ function TrackRow({
 
   return (
     <div className={`bg-gray-900/60 backdrop-blur-xl rounded-xl border transition-all ${
-      isSelected ? 'border-violet-500/50 shadow-lg shadow-violet-500/10' : 'border-gray-800/50'
+      isSelected ? 'border-slate-500/50 shadow-lg shadow-slate-500/10' : 'border-gray-800/50'
     }`}>
       {/* Track Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800/50">
@@ -593,9 +598,9 @@ function TrackRow({
                   <button
                     key={oct}
                     onClick={() => onUpdate({ octave: oct })}
-                    className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
                       oct === track.octave
-                        ? 'bg-violet-500/30 text-violet-300'
+                        ? 'bg-slate-500/30 text-slate-200 border border-slate-500/40'
                         : 'bg-gray-800 text-gray-500 hover:text-gray-300'
                     }`}
                   >

@@ -38,8 +38,11 @@ export default function Visualizer({ isPlaying }: VisualizerProps) {
             const value = data[i] || 0;
             const barHeight = (value / 255) * height;
 
-            const hue = (i / bufferLength) * 120 + 200;
-            ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${value / 255})`;
+            // Muted steel-blue to slate gradient
+            const hue = 210 + (i / bufferLength) * 30;
+            const saturation = 20 + (value / 255) * 30;
+            const lightness = 40 + (value / 255) * 30;
+            ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${0.4 + (value / 255) * 0.6})`;
             ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
 
             x += barWidth;
@@ -47,10 +50,10 @@ export default function Visualizer({ isPlaying }: VisualizerProps) {
           }
         }
       } else {
-        // Idle animation
+        // Idle animation — muted gray wave
         const time = Date.now() / 1000;
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.3)';
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
         ctx.lineWidth = 2;
 
         for (let x = 0; x < width; x++) {

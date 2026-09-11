@@ -30,7 +30,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   piano: {
     name: 'Piano',
     icon: '🎹',
-    color: '#8b5cf6',
+    color: '#64748b', // slate
     oscillators: [
       { type: 'triangle', gain: 0.6 },
       { type: 'sine', detune: 5, gain: 0.3 }
@@ -41,7 +41,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   bass: {
     name: 'Bass',
     icon: '🎸',
-    color: '#ef4444',
+    color: '#78716c', // stone
     oscillators: [
       { type: 'sine', gain: 0.8 }
     ],
@@ -51,7 +51,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   lead: {
     name: 'Lead Synth',
     icon: '🎛️',
-    color: '#f59e0b',
+    color: '#94a3b8', // lighter slate
     oscillators: [
       { type: 'sawtooth', gain: 0.5 },
       { type: 'sawtooth', detune: 10, gain: 0.3 }
@@ -62,7 +62,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   strings: {
     name: 'Strings',
     icon: '🎻',
-    color: '#10b981',
+    color: '#6b7280', // gray
     oscillators: [
       { type: 'sawtooth', gain: 0.4 },
       { type: 'sawtooth', detune: -5, gain: 0.3 }
@@ -73,7 +73,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   guitar: {
     name: 'Guitar',
     icon: '🎸',
-    color: '#ec4899',
+    color: '#a1a1aa', // zinc
     oscillators: [
       { type: 'square', gain: 0.5 }
     ],
@@ -83,7 +83,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   pad: {
     name: 'Pad',
     icon: '🌊',
-    color: '#06b6d4',
+    color: '#71717a', // zinc darker
     oscillators: [
       { type: 'sawtooth', gain: 0.3 },
       { type: 'sawtooth', detune: 7, gain: 0.25 },
@@ -95,7 +95,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   flute: {
     name: 'Flute',
     icon: '🪈',
-    color: '#84cc16',
+    color: '#9ca3af', // gray lighter
     oscillators: [
       { type: 'sine', gain: 0.7 }
     ],
@@ -105,7 +105,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   bells: {
     name: 'Bells',
     icon: '🔔',
-    color: '#eab308',
+    color: '#d4d4d8', // zinc light
     oscillators: [
       { type: 'sine', gain: 0.6 },
       { type: 'sine', detune: 1200, gain: 0.2 }
@@ -115,7 +115,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   pluck: {
     name: 'Pluck',
     icon: '🎵',
-    color: '#f97316',
+    color: '#a8a29e', // stone lighter
     oscillators: [
       { type: 'triangle', gain: 0.6 }
     ],
@@ -125,7 +125,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   kick: {
     name: 'Kick',
     icon: '🥁',
-    color: '#dc2626',
+    color: '#57534e', // stone dark
     oscillators: [],
     envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.1 },
     isDrum: true,
@@ -134,7 +134,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   snare: {
     name: 'Snare',
     icon: '🥁',
-    color: '#ca8a04',
+    color: '#78716c', // stone
     oscillators: [],
     envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
     isDrum: true,
@@ -143,7 +143,7 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
   hihat: {
     name: 'Hi-Hat',
     icon: '🥁',
-    color: '#0891b2',
+    color: '#52525b', // zinc dark
     oscillators: [],
     envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
     isDrum: true,
