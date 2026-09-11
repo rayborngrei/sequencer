@@ -31,21 +31,21 @@ const MOODS: Mood[] = [
 
 export default function App() {
   const [grid, setGrid] = useState<boolean[][]>(
-    Array(ROWS).map(() => Array(STEPS).fill(false))
+    () => Array.from({ length: ROWS }, () => Array(STEPS).fill(false))
   );
   const [drumGrid, setDrumGrid] = useState<boolean[][]>(
-    Array(3).map(() => Array(STEPS).fill(false))
+    () => Array.from({ length: 3 }, () => Array(STEPS).fill(false))
   );
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm] = useState(110);
   const [currentMood, setCurrentMood] = useState(0);
   const [waveType, setWaveType] = useState<WaveType>('sine');
-  const [reverb, setReverb] = useState(0.2);
+  const [reverb, setReverb] = useState(0.15);
   const [delay, setDelay] = useState(0.0);
-  const [volume, setVolume] = useState(0.7);
-  const [initialized, setInitialized] = useState(false);
-  
+  const [volume, setVolume] = useState(0.8);
+  const [audioReady, setAudioReady] = useState(false);
+
   const intervalRef = useRef<number | null>(null);
   const stepRef = useRef(-1);
   const gridRef = useRef(grid);
@@ -57,53 +57,67 @@ export default function App() {
   const mood = MOODS[currentMood];
   const notes: NoteInfo[] = getScaleNotes(mood.scale);
 
-  // Keep refs in sync
+  // Keep refs in sync with state
   useEffect(() => { gridRef.current = grid; }, [grid]);
   useEffect(() => { drumGridRef.current = drumGrid; }, [drumGrid]);
   useEffect(() => { notesRef.current = notes; }, [notes]);
   useEffect(() => { waveTypeRef.current = waveType; }, [waveType]);
   useEffect(() => { bpmRef.current = bpm; }, [bpm]);
 
+  // Apply effects
   useEffect(() => { audioEngine.setReverb(reverb); }, [reverb]);
   useEffect(() => { audioEngine.setDelay(delay); }, [delay]);
   useEffect(() => { audioEngine.setVolume(volume); }, [volume]);
 
-  const initAudio = useCallback(async () => {
-    if (!initialized) {
+  // Initialize audio on first user interaction
+  const ensureAudio = useCallback(async () => {
+    if (!audioReady) {
       await audioEngine.init();
-      setInitialized(true);
+      setAudioReady(true);
+    } else {
+      await audioEngine.ensureRunning();
     }
-    audioEngine.resume();
-  }, [initialized]);
+  }, [audioReady]);
 
+  // Toggle melodic cell
   const toggleCell = useCallback(async (row: number, step: number) => {
-    await initAudio();
+    await ensureAudio();
+
+    const newActive = !grid[row]?.[step];
+
+    // Update grid
     setGrid(prev => {
-      const newGrid = prev.map(r => [...r]);
-      if (!newGrid[row]) return prev;
-      newGrid[row][step] = !newGrid[row][step];
-      if (newGrid[row][step]) {
-        const currentNotes = notesRef.current;
-        const noteIndex = ROWS - 1 - row;
-        const note = currentNotes?.[noteIndex];
-        if (note) {
-          audioEngine.playNote(note.frequency, waveTypeRef.current, 0.3, 0.4);
-        }
+      const next = prev.map(r => [...r]);
+      if (next[row]) {
+        next[row][step] = newActive;
       }
-      return newGrid;
+      return next;
     });
-  }, [initAudio]);
 
+    // Play preview sound when activating
+    if (newActive) {
+      const currentNotes = notesRef.current;
+      const noteIndex = ROWS - 1 - row;
+      const note = currentNotes?.[noteIndex];
+      if (note && note.frequency > 0) {
+        audioEngine.playNote(note.frequency, waveTypeRef.current, 0.35, 0.6);
+      }
+    }
+  }, [ensureAudio, grid]);
+
+  // Toggle drum cell
   const toggleDrumCell = useCallback(async (row: number, step: number) => {
-    await initAudio();
+    await ensureAudio();
     setDrumGrid(prev => {
-      const newGrid = prev.map(r => [...r]);
-      if (!newGrid[row]) return prev;
-      newGrid[row][step] = !newGrid[row][step];
-      return newGrid;
+      const next = prev.map(r => [...r]);
+      if (next[row]) {
+        next[row][step] = !next[row][step];
+      }
+      return next;
     });
-  }, [initAudio]);
+  }, [ensureAudio]);
 
+  // Sequencer step function — uses refs to avoid stale closures
   const playStep = useCallback(() => {
     stepRef.current = (stepRef.current + 1) % STEPS;
     const step = stepRef.current;
@@ -118,31 +132,33 @@ export default function App() {
 
     if (!currentGrid || !currentDrums || !currentNotes) return;
 
-    // Play melodic notes
+    // Melodic notes
     for (let row = 0; row < ROWS; row++) {
-      if (currentGrid[row] && currentGrid[row][step]) {
+      const rowData = currentGrid[row];
+      if (rowData && rowData[step]) {
         const noteIndex = ROWS - 1 - row;
         const note = currentNotes[noteIndex];
-        if (note) {
-          audioEngine.playNote(note.frequency, currentWave, beatDuration * 2, 0.5);
+        if (note && note.frequency > 0) {
+          audioEngine.playNote(note.frequency, currentWave, beatDuration * 2.5, 0.55);
         }
       }
     }
 
-    // Play drums
-    if (currentDrums[0] && currentDrums[0][step]) audioEngine.playKick();
-    if (currentDrums[1] && currentDrums[1][step]) audioEngine.playSnare();
-    if (currentDrums[2] && currentDrums[2][step]) audioEngine.playHihat();
+    // Drums
+    if (currentDrums[0]?.[step]) audioEngine.playKick();
+    if (currentDrums[1]?.[step]) audioEngine.playSnare();
+    if (currentDrums[2]?.[step]) audioEngine.playHihat();
   }, []);
 
   const startPlayback = useCallback(async () => {
-    await initAudio();
+    await ensureAudio();
     setIsPlaying(true);
     stepRef.current = -1;
-    
+
     const intervalMs = (60 / bpmRef.current / 4) * 1000;
+    if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = window.setInterval(playStep, intervalMs);
-  }, [initAudio, playStep]);
+  }, [ensureAudio, playStep]);
 
   const stopPlayback = useCallback(() => {
     setIsPlaying(false);
@@ -165,40 +181,34 @@ export default function App() {
   // Update interval when BPM changes during playback
   useEffect(() => {
     if (isPlaying) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
       const intervalMs = (60 / bpm / 4) * 1000;
       intervalRef.current = window.setInterval(playStep, intervalMs);
     }
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [bpm, isPlaying, playStep]);
 
   const clearGrid = () => {
-    setGrid(Array(ROWS).map(() => Array(STEPS).fill(false)));
-    setDrumGrid(Array(3).map(() => Array(STEPS).fill(false)));
+    setGrid(Array.from({ length: ROWS }, () => Array(STEPS).fill(false)));
+    setDrumGrid(Array.from({ length: 3 }, () => Array(STEPS).fill(false)));
   };
 
   const randomizeGrid = () => {
-    const density = 0.2;
     setGrid(
-      Array(ROWS).map(() =>
-        Array(STEPS).fill(false).map(() => Math.random() < density)
+      Array.from({ length: ROWS }, () =>
+        Array.from({ length: STEPS }, () => Math.random() < 0.2)
       )
     );
-    setDrumGrid(
-      Array(3).map((_, row) =>
-        Array(STEPS).fill(false).map(() => {
-          if (row === 0) return Math.random() < 0.15;
-          if (row === 1) return Math.random() < 0.1;
-          return Math.random() < 0.25;
-        })
-      )
-    );
+    setDrumGrid([
+      Array.from({ length: STEPS }, () => Math.random() < 0.15),
+      Array.from({ length: STEPS }, () => Math.random() < 0.1),
+      Array.from({ length: STEPS }, () => Math.random() < 0.25),
+    ]);
   };
 
   const changeMood = (index: number) => {
@@ -208,26 +218,20 @@ export default function App() {
     setBpm(m.bpm);
   };
 
-  const getCellColor = (row: number, _step: number, isActive: boolean) => {
+  const getCellColor = (row: number, step: number, isActive: boolean) => {
     if (!isActive) return '';
-    
-    const isCurrentPlayhead = _step === currentStep;
-    
-    if (isCurrentPlayhead && isPlaying) {
-      return `bg-white shadow-lg shadow-white/50`;
+    if (step === currentStep && isPlaying) {
+      return 'bg-white shadow-lg shadow-white/50';
     }
-    
     const colors = [
       'bg-rose-400', 'bg-orange-400', 'bg-amber-400', 'bg-yellow-400',
       'bg-lime-400', 'bg-emerald-400', 'bg-cyan-400', 'bg-violet-400'
     ];
-    
     return colors[ROWS - 1 - row] || 'bg-white';
   };
 
   const getDrumColor = (row: number) => {
-    const colors = ['bg-red-500', 'bg-yellow-500', 'bg-blue-400'];
-    return colors[row];
+    return ['bg-red-500', 'bg-yellow-500', 'bg-blue-400'][row];
   };
 
   return (
@@ -235,7 +239,7 @@ export default function App() {
       {/* Background gradient */}
       <div className={`absolute inset-0 bg-gradient-to-br ${mood.color} opacity-10 transition-all duration-1000`} />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(100,100,255,0.1),transparent_50%)]" />
-      
+
       {/* Grid pattern overlay */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: 'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
@@ -259,7 +263,7 @@ export default function App() {
               <p className="text-xs text-gray-500">Interactive Music Sequencer</p>
             </div>
           </div>
-          
+
           <Visualizer isPlaying={isPlaying} />
         </header>
 
@@ -302,26 +306,22 @@ export default function App() {
 
         {/* Main Sequencer Grid */}
         <div className="bg-gray-900/60 backdrop-blur-xl rounded-2xl border border-gray-800/50 p-4 mb-4 shadow-2xl">
-          {/* Note labels and grid */}
           <div className="flex gap-1">
             {/* Note names */}
-            <div className="flex flex-col gap-1 pr-2 pt-0">
+            <div className="flex flex-col gap-1 pr-2">
               {notes.map((note, i) => (
-                <div
-                  key={i}
-                  className="h-8 flex items-center justify-end text-xs text-gray-500 font-mono w-8"
-                >
+                <div key={i} className="h-8 flex items-center justify-end text-xs text-gray-500 font-mono w-8">
                   {note.name}
                 </div>
               ))}
             </div>
-            
+
             {/* Grid */}
             <div className="flex-1 overflow-x-auto">
               <div className="min-w-[500px]">
                 {/* Step indicators */}
                 <div className="flex gap-1 mb-1">
-                  {Array(STEPS).fill(0).map((_, step) => (
+                  {Array.from({ length: STEPS }, (_, step) => (
                     <div
                       key={step}
                       className={`flex-1 h-3 rounded-sm transition-colors duration-75 ${
@@ -334,11 +334,11 @@ export default function App() {
                     />
                   ))}
                 </div>
-                
+
                 {/* Note rows */}
                 {notes.map((_, row) => (
                   <div key={row} className="flex gap-1 mb-1">
-                    {Array(STEPS).fill(0).map((_, step) => {
+                    {Array.from({ length: STEPS }, (_, step) => {
                       const actualRow = ROWS - 1 - row;
                       const isActive = grid[actualRow]?.[step] ?? false;
                       const isBeat = step % 4 === 0;
@@ -376,7 +376,7 @@ export default function App() {
               <div key={row} className="flex items-center gap-1">
                 <span className="text-xs text-gray-500 font-mono w-12 text-right pr-2">{name}</span>
                 <div className="flex-1 flex gap-1 min-w-[500px]">
-                  {Array(STEPS).fill(0).map((_, step) => {
+                  {Array.from({ length: STEPS }, (_, step) => {
                     const isActive = drumGrid[row]?.[step] ?? false;
                     const isBeat = step % 4 === 0;
                     return (
@@ -422,7 +422,7 @@ export default function App() {
               >
                 {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
               </motion.button>
-              
+
               <motion.button
                 onClick={() => { stopPlayback(); stepRef.current = -1; setCurrentStep(-1); }}
                 whileHover={{ scale: 1.1 }}
@@ -458,8 +458,7 @@ export default function App() {
               <Music className="w-4 h-4 text-violet-400" />
               <span className="text-sm text-gray-400 font-medium">Sound</span>
             </div>
-            
-            {/* BPM */}
+
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Tempo</span>
@@ -475,7 +474,6 @@ export default function App() {
               />
             </div>
 
-            {/* Wave type */}
             <div className="flex gap-1">
               {(['sine', 'triangle', 'sawtooth', 'square'] as WaveType[]).map((w) => (
                 <button
@@ -499,8 +497,7 @@ export default function App() {
               <Volume2 className="w-4 h-4 text-emerald-400" />
               <span className="text-sm text-gray-400 font-medium">Effects</span>
             </div>
-            
-            {/* Volume */}
+
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Volume</span>
@@ -516,7 +513,6 @@ export default function App() {
               />
             </div>
 
-            {/* Reverb */}
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Reverb</span>
@@ -532,7 +528,6 @@ export default function App() {
               />
             </div>
 
-            {/* Delay */}
             <div>
               <div className="flex justify-between text-xs text-gray-500 mb-1">
                 <span>Delay</span>
@@ -541,7 +536,7 @@ export default function App() {
               <input
                 type="range"
                 min="0"
-                max="80"
+                max="70"
                 value={delay * 100}
                 onChange={(e) => setDelay(Number(e.target.value) / 100)}
                 className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer text-emerald-500"
@@ -550,7 +545,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Footer hint */}
+        {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-600">
             Click cells to add/remove notes • Change mood to transform the sound • Press play to hear your creation
