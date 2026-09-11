@@ -23,7 +23,7 @@ export interface InstrumentPreset {
     Q: number;
   };
   isDrum?: boolean;
-  drumType?: 'kick' | 'snare' | 'hihat';
+  drumType?: 'kick' | 'snare' | 'hihat' | 'tom' | 'clap' | 'rim' | 'cowbell';
 }
 
 export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
@@ -148,6 +148,111 @@ export const INSTRUMENT_PRESETS: Record<string, InstrumentPreset> = {
     envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.02 },
     isDrum: true,
     drumType: 'hihat'
+  },
+  // Additional melodic instruments
+  organ: {
+    name: 'Organ',
+    icon: '🎹',
+    color: '#737373',
+    oscillators: [
+      { type: 'sine', gain: 0.4 },
+      { type: 'sine', detune: 1200, gain: 0.2 },
+      { type: 'sine', detune: 1900, gain: 0.15 }
+    ],
+    envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.1 },
+    filter: { type: 'lowpass', frequency: 2200, Q: 1 }
+  },
+  choir: {
+    name: 'Choir',
+    icon: '🎤',
+    color: '#a3a3a3',
+    oscillators: [
+      { type: 'sine', gain: 0.3 },
+      { type: 'triangle', detune: 5, gain: 0.25 },
+      { type: 'sine', detune: -5, gain: 0.25 }
+    ],
+    envelope: { attack: 0.2, decay: 0.3, sustain: 0.7, release: 0.6 },
+    filter: { type: 'lowpass', frequency: 1800, Q: 1 }
+  },
+  harp: {
+    name: 'Harp',
+    icon: '🎼',
+    color: '#d4d4d4',
+    oscillators: [
+      { type: 'triangle', gain: 0.5 }
+    ],
+    envelope: { attack: 0.001, decay: 0.4, sustain: 0.1, release: 0.4 },
+    filter: { type: 'lowpass', frequency: 3500, Q: 1 }
+  },
+  brass: {
+    name: 'Brass',
+    icon: '🎺',
+    color: '#78716c',
+    oscillators: [
+      { type: 'sawtooth', gain: 0.5 },
+      { type: 'square', detune: 3, gain: 0.2 }
+    ],
+    envelope: { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.2 },
+    filter: { type: 'lowpass', frequency: 1600, Q: 2 }
+  },
+  synth2: {
+    name: 'Synth Lead 2',
+    icon: '🎛️',
+    color: '#525252',
+    oscillators: [
+      { type: 'square', gain: 0.4 },
+      { type: 'sawtooth', detune: 7, gain: 0.3 }
+    ],
+    envelope: { attack: 0.01, decay: 0.15, sustain: 0.7, release: 0.2 },
+    filter: { type: 'lowpass', frequency: 2800, Q: 4 }
+  },
+  marimba: {
+    name: 'Marimba',
+    icon: '🥢',
+    color: '#a8a29e',
+    oscillators: [
+      { type: 'sine', gain: 0.6 },
+      { type: 'triangle', detune: 2400, gain: 0.15 }
+    ],
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0.05, release: 0.2 },
+    filter: { type: 'lowpass', frequency: 2000, Q: 1 }
+  },
+  // Additional percussion
+  tom: {
+    name: 'Tom',
+    icon: '🥁',
+    color: '#6b7280',
+    oscillators: [],
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
+    isDrum: true,
+    drumType: 'tom'
+  },
+  clap: {
+    name: 'Clap',
+    icon: '👏',
+    color: '#9ca3af',
+    oscillators: [],
+    envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 },
+    isDrum: true,
+    drumType: 'clap'
+  },
+  rim: {
+    name: 'Rimshot',
+    icon: '🪘',
+    color: '#78716c',
+    oscillators: [],
+    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.03 },
+    isDrum: true,
+    drumType: 'rim'
+  },
+  cowbell: {
+    name: 'Cowbell',
+    icon: '🔔',
+    color: '#a1a1aa',
+    oscillators: [],
+    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
+    isDrum: true,
+    drumType: 'cowbell'
   }
 };
 
@@ -411,6 +516,95 @@ export class AudioEngine {
         gain.connect(this.masterGain);
 
         src.start(t);
+      } else if (preset.drumType === 'tom') {
+        // Tom - pitched sine with fast decay
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.15);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume * 0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(t);
+        osc.stop(t + 0.3);
+      } else if (preset.drumType === 'clap') {
+        // Clap - noise burst with envelope
+        const sr = this.ctx.sampleRate;
+        const len = Math.floor(sr * 0.1);
+        if (len <= 0) return;
+
+        const buf = this.ctx.createBuffer(1, len, sr);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+          d[i] = Math.random() * 2 - 1;
+        }
+
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 1500;
+        bp.Q.value = 2;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume * 0.6, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+        src.connect(bp);
+        bp.connect(gain);
+        gain.connect(this.masterGain);
+
+        src.start(t);
+      } else if (preset.drumType === 'rim') {
+        // Rimshot - short click
+        const osc = this.ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1800, t);
+        osc.frequency.exponentialRampToValueAtTime(800, t + 0.02);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume * 0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(t);
+        osc.stop(t + 0.1);
+      } else if (preset.drumType === 'cowbell') {
+        // Cowbell - two detuned square waves
+        const osc1 = this.ctx.createOscillator();
+        osc1.type = 'square';
+        osc1.frequency.setValueAtTime(800, t);
+
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = 'square';
+        osc2.frequency.setValueAtTime(540, t);
+
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 800;
+        bp.Q.value = 3;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(volume * 0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+
+        osc1.connect(bp);
+        osc2.connect(bp);
+        bp.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc1.start(t);
+        osc2.start(t);
+        osc1.stop(t + 0.2);
+        osc2.stop(t + 0.2);
       }
     } catch (e) {
       console.warn('playDrum error:', e);

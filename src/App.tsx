@@ -2,12 +2,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Play, Pause, SkipBack, Trash2, Plus, Volume2, 
-  Waves, Music, Disc3, X
+  Waves, Music, Disc3, X, Shuffle
 } from 'lucide-react';
 import { audioEngine, INSTRUMENT_PRESETS, type InstrumentPreset } from './audioEngine';
 import Visualizer from './Visualizer';
 
-const STEPS = 16;
+const STEPS = 32;
 
 // Musical notes for pitch selection
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -47,7 +47,9 @@ export default function App() {
   const [tracks, setTracks] = useState<Track[]>(() => [
     createTrack('piano', 4),
     createTrack('bass', 3),
+    createTrack('lead', 5),
     createTrack('kick', 4),
+    createTrack('hihat', 4),
   ]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
@@ -197,6 +199,43 @@ export default function App() {
     })));
   };
 
+  const randomizeAll = () => {
+    setTracks(prev => prev.map(track => {
+      if (track.preset.isDrum) {
+        // For drums: sparse pattern, more on beats
+        return {
+          ...track,
+          notes: Array.from({ length: STEPS }, (_, step) => {
+            const isBeat = step % 4 === 0;
+            const isOffbeat = step % 2 === 0;
+            let probability = 0.08;
+            if (track.preset.drumType === 'kick') probability = isBeat ? 0.5 : 0.05;
+            else if (track.preset.drumType === 'snare') probability = (step % 8 === 4) ? 0.7 : 0.03;
+            else if (track.preset.drumType === 'hihat') probability = isOffbeat ? 0.4 : 0.15;
+            else if (track.preset.drumType === 'clap') probability = (step % 8 === 4) ? 0.4 : 0.02;
+            else probability = 0.1;
+            return [Math.random() < probability];
+          })
+        };
+      } else {
+        // For melodic: pentatonic-ish pattern with rests
+        const scaleNotes = [0, 2, 4, 7, 9]; // pentatonic intervals
+        const density = 0.15 + Math.random() * 0.1;
+        return {
+          ...track,
+          notes: Array.from({ length: STEPS }, (_, step) => {
+            return Array.from({ length: NOTES.length }, (_, noteIdx) => {
+              if (Math.random() > density) return false;
+              // Prefer scale notes
+              const isScaleNote = scaleNotes.includes(noteIdx % 12);
+              return isScaleNote ? Math.random() < 0.7 : Math.random() < 0.2;
+            });
+          })
+        };
+      }
+    }));
+  };
+
   const instrumentKeys = Object.keys(INSTRUMENT_PRESETS);
   const melodicInstruments = instrumentKeys.filter(k => !INSTRUMENT_PRESETS[k].isDrum);
   const drumInstruments = instrumentKeys.filter(k => INSTRUMENT_PRESETS[k].isDrum);
@@ -260,6 +299,16 @@ export default function App() {
             className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-800 border border-gray-700 text-gray-400 hover:text-red-400"
           >
             <Trash2 className="w-3.5 h-3.5" />
+          </motion.button>
+
+          <motion.button
+            onClick={randomizeAll}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-800 border border-gray-700 text-gray-400 hover:text-amber-400"
+            title="Randomize pattern"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
           </motion.button>
 
           <div className="h-6 w-px bg-gray-700" />
@@ -548,15 +597,17 @@ function TrackRow({
 
       {/* Grid */}
       <div className="px-2 py-2 overflow-x-auto">
-        <div className="min-w-[400px]">
+        <div className="min-w-[700px]">
           {/* Step indicators */}
-          <div className="flex gap-0.5 mb-1">
+          <div className="flex gap-px mb-1">
             {Array.from({ length: STEPS }, (_, step) => (
               <div
                 key={step}
-                className={`flex-1 h-2 rounded-sm transition-colors duration-75 ${
+                className={`flex-1 h-1.5 rounded-sm transition-colors duration-75 ${
                   step === currentStep && isPlaying
                     ? 'bg-white/60'
+                    : step % 8 === 0
+                    ? 'bg-gray-600'
                     : step % 4 === 0
                     ? 'bg-gray-700'
                     : 'bg-gray-800/50'
@@ -567,7 +618,7 @@ function TrackRow({
 
           {track.preset.isDrum ? (
             // Drum: single row
-            <div className="flex gap-0.5">
+            <div className="flex gap-px">
               {Array.from({ length: STEPS }, (_, step) => {
                 const isActive = track.notes[step]?.[0] ?? false;
                 const isBeat = step % 4 === 0;
@@ -576,7 +627,7 @@ function TrackRow({
                     key={step}
                     onClick={() => onToggleNote(step, 0)}
                     whileTap={{ scale: 0.9 }}
-                    className={`flex-1 h-7 rounded-sm transition-all ${
+                    className={`flex-1 h-6 rounded-sm transition-all ${
                       isActive
                         ? `shadow-md ${step === currentStep && isPlaying ? 'bg-white ring-1 ring-white/50' : ''}`
                         : isBeat
@@ -590,7 +641,7 @@ function TrackRow({
             </div>
           ) : (
             // Melodic: show one octave (12 notes)
-            <div className="space-y-0.5">
+            <div className="space-y-px">
               {/* Octave selector */}
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[9px] text-gray-500">Octave:</span>
@@ -612,22 +663,28 @@ function TrackRow({
               {/* Note rows - reversed so higher notes are on top */}
               {[...NOTES].reverse().map((noteName, reversedIdx) => {
                 const noteIdx = NOTES.length - 1 - reversedIdx;
+                const isBlackKey = noteName.includes('#');
                 return (
-                  <div key={noteName} className="flex gap-0.5 items-center">
-                    <span className="text-[8px] text-gray-600 w-5 text-right font-mono pr-1">
+                  <div key={noteName} className="flex gap-px items-center">
+                    <span className={`text-[8px] w-5 text-right font-mono pr-1 ${isBlackKey ? 'text-gray-500' : 'text-gray-400'}`}>
                       {noteName}
                     </span>
                     {Array.from({ length: STEPS }, (_, step) => {
                       const isActive = track.notes[step]?.[noteIdx] ?? false;
                       const isBeat = step % 4 === 0;
+                      const isBlackRow = isBlackKey;
                       return (
                         <motion.button
                           key={step}
                           onClick={() => onToggleNote(step, noteIdx)}
                           whileTap={{ scale: 0.9 }}
-                          className={`flex-1 h-4 rounded-sm transition-all ${
+                          className={`flex-1 h-3 rounded-[2px] transition-all ${
                             isActive
                               ? `shadow-sm ${step === currentStep && isPlaying ? 'bg-white ring-1 ring-white/50' : ''}`
+                              : isBlackRow
+                              ? isBeat
+                                ? 'bg-gray-750/50 hover:bg-gray-600/50'
+                                : 'bg-gray-850/50 hover:bg-gray-700/50'
                               : isBeat
                               ? 'bg-gray-700/40 hover:bg-gray-600/40'
                               : 'bg-gray-800/40 hover:bg-gray-700/40'
