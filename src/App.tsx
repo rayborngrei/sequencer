@@ -80,11 +80,15 @@ export default function App() {
     await initAudio();
     setGrid(prev => {
       const newGrid = prev.map(r => [...r]);
+      if (!newGrid[row]) return prev;
       newGrid[row][step] = !newGrid[row][step];
       if (newGrid[row][step]) {
         const currentNotes = notesRef.current;
-        const note = currentNotes[ROWS - 1 - row];
-        audioEngine.playNote(note.frequency, waveTypeRef.current, 0.3, 0.4);
+        const noteIndex = ROWS - 1 - row;
+        const note = currentNotes?.[noteIndex];
+        if (note) {
+          audioEngine.playNote(note.frequency, waveTypeRef.current, 0.3, 0.4);
+        }
       }
       return newGrid;
     });
@@ -94,6 +98,7 @@ export default function App() {
     await initAudio();
     setDrumGrid(prev => {
       const newGrid = prev.map(r => [...r]);
+      if (!newGrid[row]) return prev;
       newGrid[row][step] = !newGrid[row][step];
       return newGrid;
     });
@@ -111,18 +116,23 @@ export default function App() {
     const currentBpm = bpmRef.current;
     const beatDuration = 60 / currentBpm / 4;
 
+    if (!currentGrid || !currentDrums || !currentNotes) return;
+
     // Play melodic notes
     for (let row = 0; row < ROWS; row++) {
-      if (currentGrid[row][step]) {
-        const note = currentNotes[ROWS - 1 - row];
-        audioEngine.playNote(note.frequency, currentWave, beatDuration * 2, 0.5);
+      if (currentGrid[row] && currentGrid[row][step]) {
+        const noteIndex = ROWS - 1 - row;
+        const note = currentNotes[noteIndex];
+        if (note) {
+          audioEngine.playNote(note.frequency, currentWave, beatDuration * 2, 0.5);
+        }
       }
     }
 
     // Play drums
-    if (currentDrums[0][step]) audioEngine.playKick();
-    if (currentDrums[1][step]) audioEngine.playSnare();
-    if (currentDrums[2][step]) audioEngine.playHihat();
+    if (currentDrums[0] && currentDrums[0][step]) audioEngine.playKick();
+    if (currentDrums[1] && currentDrums[1][step]) audioEngine.playSnare();
+    if (currentDrums[2] && currentDrums[2][step]) audioEngine.playHihat();
   }, []);
 
   const startPlayback = useCallback(async () => {
@@ -330,7 +340,7 @@ export default function App() {
                   <div key={row} className="flex gap-1 mb-1">
                     {Array(STEPS).fill(0).map((_, step) => {
                       const actualRow = ROWS - 1 - row;
-                      const isActive = grid[actualRow][step];
+                      const isActive = grid[actualRow]?.[step] ?? false;
                       const isBeat = step % 4 === 0;
                       return (
                         <motion.button
@@ -367,7 +377,7 @@ export default function App() {
                 <span className="text-xs text-gray-500 font-mono w-12 text-right pr-2">{name}</span>
                 <div className="flex-1 flex gap-1 min-w-[500px]">
                   {Array(STEPS).fill(0).map((_, step) => {
-                    const isActive = drumGrid[row][step];
+                    const isActive = drumGrid[row]?.[step] ?? false;
                     const isBeat = step % 4 === 0;
                     return (
                       <motion.button

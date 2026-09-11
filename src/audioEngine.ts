@@ -84,7 +84,10 @@ export class AudioEngine {
     
     // Reverb (simple impulse response)
     this.reverbNode = this.ctx.createConvolver();
-    this.reverbNode.buffer = this.createReverbIR(2.0, 2.0);
+    const reverbIR = this.createReverbIR(2.0, 2.0);
+    if (reverbIR) {
+      this.reverbNode.buffer = reverbIR;
+    }
     
     // Routing
     this.compressor.connect(this.analyser);
@@ -103,157 +106,196 @@ export class AudioEngine {
     this.masterGain.connect(this.delayNode);
   }
 
-  private createReverbIR(duration: number, decay: number): AudioBuffer {
-    const sampleRate = this.ctx!.sampleRate;
-    const length = sampleRate * duration;
-    const buffer = this.ctx!.createBuffer(2, length, sampleRate);
+  private createReverbIR(duration: number, decay: number): AudioBuffer | null {
+    if (!this.ctx) return null;
     
-    for (let channel = 0; channel < 2; channel++) {
-      const data = buffer.getChannelData(channel);
-      for (let i = 0; i < length; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    try {
+      const sampleRate = this.ctx.sampleRate;
+      const length = Math.floor(sampleRate * duration);
+      if (length <= 0) return null;
+      
+      const buffer = this.ctx.createBuffer(2, length, sampleRate);
+      
+      for (let channel = 0; channel < 2; channel++) {
+        const data = buffer.getChannelData(channel);
+        if (!data) continue;
+        for (let i = 0; i < length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+        }
       }
+      return buffer;
+    } catch (e) {
+      console.warn('AudioEngine createReverbIR error:', e);
+      return null;
     }
-    return buffer;
   }
 
   playNote(frequency: number, waveType: WaveType, duration: number = 0.2, velocity: number = 0.5) {
     if (!this.ctx || !this.masterGain) return;
+    if (!frequency || !isFinite(frequency)) return;
     
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
 
-    const now = this.ctx.currentTime;
-    
-    // Oscillator
-    const osc = this.ctx.createOscillator();
-    osc.type = waveType;
-    osc.frequency.setValueAtTime(frequency, now);
-    
-    // Add slight detune for richness
-    const osc2 = this.ctx.createOscillator();
-    osc2.type = waveType;
-    osc2.frequency.setValueAtTime(frequency * 1.002, now);
-    
-    // Envelope
-    const envelope = this.ctx.createGain();
-    envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(velocity * 0.4, now + 0.01);
-    envelope.gain.exponentialRampToValueAtTime(velocity * 0.15, now + duration * 0.3);
-    envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    
-    // Filter
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(frequency * 4, now);
-    filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, now + duration);
-    filter.Q.value = 2;
-    
-    // Connect
-    osc.connect(filter);
-    osc2.connect(filter);
-    filter.connect(envelope);
-    envelope.connect(this.masterGain);
-    
-    osc.start(now);
-    osc2.start(now);
-    osc.stop(now + duration + 0.1);
-    osc2.stop(now + duration + 0.1);
+    try {
+      const now = this.ctx.currentTime;
+      
+      // Oscillator
+      const osc = this.ctx.createOscillator();
+      osc.type = waveType;
+      osc.frequency.setValueAtTime(frequency, now);
+      
+      // Add slight detune for richness
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = waveType;
+      osc2.frequency.setValueAtTime(frequency * 1.002, now);
+      
+      // Envelope
+      const envelope = this.ctx.createGain();
+      envelope.gain.setValueAtTime(0, now);
+      envelope.gain.linearRampToValueAtTime(velocity * 0.4, now + 0.01);
+      envelope.gain.exponentialRampToValueAtTime(velocity * 0.15, now + duration * 0.3);
+      envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      
+      // Filter
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(frequency * 4, now);
+      filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, now + duration);
+      filter.Q.value = 2;
+      
+      // Connect
+      osc.connect(filter);
+      osc2.connect(filter);
+      filter.connect(envelope);
+      envelope.connect(this.masterGain);
+      
+      osc.start(now);
+      osc2.start(now);
+      osc.stop(now + duration + 0.1);
+      osc2.stop(now + duration + 0.1);
+    } catch (e) {
+      // Silently fail if audio context is in bad state
+      console.warn('AudioEngine playNote error:', e);
+    }
   }
 
   playKick() {
     if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
     
-    const osc = this.ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
-    
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.8, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    
-    osc.start(now);
-    osc.stop(now + 0.3);
+    try {
+      const now = this.ctx.currentTime;
+      
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+      
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.8, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } catch (e) {
+      console.warn('AudioEngine playKick error:', e);
+    }
   }
 
   playHihat() {
     if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
     
-    const bufferSize = this.ctx.sampleRate * 0.05;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+    try {
+      const now = this.ctx.currentTime;
+      
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.05);
+      if (bufferSize <= 0) return;
+      
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      if (!data) return;
+      
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 8000;
+      
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      
+      source.start(now);
+    } catch (e) {
+      console.warn('AudioEngine playHihat error:', e);
     }
-    
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 8000;
-    
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-    
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-    
-    source.start(now);
   }
 
   playSnare() {
     if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
     
-    // Noise part
-    const bufferSize = this.ctx.sampleRate * 0.1;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
+    try {
+      const now = this.ctx.currentTime;
+      
+      // Noise part
+      const bufferSize = Math.floor(this.ctx.sampleRate * 0.1);
+      if (bufferSize <= 0) return;
+      
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      if (!data) return;
+      
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      
+      const noiseSource = this.ctx.createBufferSource();
+      noiseSource.buffer = buffer;
+      
+      const noiseFilter = this.ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 3000;
+      
+      const noiseGain = this.ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.5, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      
+      noiseSource.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+      
+      // Tone part
+      const osc = this.ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
+      
+      const oscGain = this.ctx.createGain();
+      oscGain.gain.setValueAtTime(0.4, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+      
+      noiseSource.start(now);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } catch (e) {
+      console.warn('AudioEngine playSnare error:', e);
     }
-    
-    const noiseSource = this.ctx.createBufferSource();
-    noiseSource.buffer = buffer;
-    
-    const noiseFilter = this.ctx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 3000;
-    
-    const noiseGain = this.ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.5, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    
-    noiseSource.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-    
-    // Tone part
-    const osc = this.ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(200, now);
-    osc.frequency.exponentialRampToValueAtTime(100, now + 0.05);
-    
-    const oscGain = this.ctx.createGain();
-    oscGain.gain.setValueAtTime(0.4, now);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-    
-    osc.connect(oscGain);
-    oscGain.connect(this.masterGain);
-    
-    noiseSource.start(now);
-    osc.start(now);
-    osc.stop(now + 0.1);
   }
 
   setBpm(_bpm: number) {
@@ -261,41 +303,49 @@ export class AudioEngine {
   }
 
   setReverb(amount: number) {
-    if (this.wetGain) {
-      this.wetGain.gain.value = amount;
+    if (this.wetGain && isFinite(amount)) {
+      this.wetGain.gain.value = Math.max(0, Math.min(1, amount));
     }
   }
 
   setDelay(amount: number) {
-    if (this.delayFeedback) {
-      this.delayFeedback.gain.value = amount * 0.5;
+    if (this.delayFeedback && isFinite(amount)) {
+      this.delayFeedback.gain.value = Math.max(0, Math.min(0.5, amount * 0.5));
     }
   }
 
   setDelayTime(time: number) {
-    if (this.delayNode) {
+    if (this.delayNode && isFinite(time) && time > 0) {
       this.delayNode.delayTime.value = time;
     }
   }
 
   setVolume(vol: number) {
-    if (this.masterGain) {
-      this.masterGain.gain.value = vol;
+    if (this.masterGain && isFinite(vol)) {
+      this.masterGain.gain.value = Math.max(0, Math.min(1, vol));
     }
   }
 
   getAnalyserData(): Uint8Array {
     if (!this.analyser) return new Uint8Array(128);
-    const data = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(data);
-    return data;
+    try {
+      const data = new Uint8Array(this.analyser.frequencyBinCount);
+      this.analyser.getByteFrequencyData(data);
+      return data;
+    } catch {
+      return new Uint8Array(128);
+    }
   }
 
   getWaveformData(): Uint8Array {
     if (!this.analyser) return new Uint8Array(128);
-    const data = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteTimeDomainData(data);
-    return data;
+    try {
+      const data = new Uint8Array(this.analyser.frequencyBinCount);
+      this.analyser.getByteTimeDomainData(data);
+      return data;
+    } catch {
+      return new Uint8Array(128);
+    }
   }
 
   resume() {

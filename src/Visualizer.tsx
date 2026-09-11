@@ -20,19 +20,29 @@ export default function Visualizer({ isPlaying }: VisualizerProps) {
       const width = canvas.width;
       const height = canvas.height;
       
+      if (width === 0 || height === 0) {
+        animFrameRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      
       ctx.clearRect(0, 0, width, height);
       
       if (isPlaying) {
         const data = audioEngine.getAnalyserData();
+        if (!data || data.length === 0) {
+          animFrameRef.current = requestAnimationFrame(draw);
+          return;
+        }
         const bufferLength = data.length;
         const barWidth = (width / bufferLength) * 2;
         
         let x = 0;
         for (let i = 0; i < bufferLength; i++) {
-          const barHeight = (data[i] / 255) * height;
+          const value = data[i] || 0;
+          const barHeight = (value / 255) * height;
           
           const hue = (i / bufferLength) * 120 + 200;
-          ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${data[i] / 255})`;
+          ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${value / 255})`;
           ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
           
           x += barWidth;
